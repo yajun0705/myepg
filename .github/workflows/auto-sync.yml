@@ -26,26 +26,30 @@ jobs:
           git remote add upstream https://github.com/kuke31/xmlgz.git || true
           git fetch upstream
 
-      - name: 判断是否更新
+      - name: 判断是否更新并生成状态文件
         id: check
         run: |
           LOCAL=$(git rev-parse @)
           REMOTE=$(git rev-parse upstream/main)
+          TIME=$(date +"%Y-%m-%d %H:%M:%S")
+
           if [ "$LOCAL" = "$REMOTE" ]; then
             echo "update=no" >> $GITHUB_ENV
+            echo "【未更新】$TIME | 上游暂无更新" > sync_status.txt
           else
             echo "update=yes" >> $GITHUB_ENV
+            echo "【已同步】$TIME | 成功同步上游最新代码" > sync_status.txt
           fi
 
-      - name: 合并更新（不覆盖yml）
+      - name: 合并更新
         if: env.update == 'yes'
         run: |
           git merge upstream/main --no-edit --allow-unrelated-histories
 
-      - name: 推送到自己仓库
-        if: env.update == 'yes'
-        uses: ad-m/github-push-action@master
-        with:
-          branch: main
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          force: false
+      - name: 提交状态文件并推送
+        run: |
+          git add sync_status.txt
+          git commit -m "更新同步状态文件" || true
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
