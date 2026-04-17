@@ -1,0 +1,51 @@
+name: 同步上游仓库
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 设置Git信息
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: 添加上游
+        run: |
+          git remote add upstream https://github.com/kuke31/xmlgz.git || true
+          git fetch upstream
+
+      - name: 判断是否更新
+        id: check
+        run: |
+          LOCAL=$(git rev-parse @)
+          REMOTE=$(git rev-parse upstream/main)
+          if [ "$LOCAL" = "$REMOTE" ]; then
+            echo "update=no" >> $GITHUB_ENV
+          else
+            echo "update=yes" >> $GITHUB_ENV
+          fi
+
+      - name: 合并更新（不覆盖yml）
+        if: env.update == 'yes'
+        run: |
+          git merge upstream/main --no-edit --allow-unrelated-histories
+
+      - name: 推送到自己仓库
+        if: env.update == 'yes'
+        uses: ad-m/github-push-action@master
+        with:
+          branch: main
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          force: false
