@@ -1,7 +1,8 @@
-name: 同步上游并生成状态文件
+name: 同步上游仓库
 on:
   schedule:
-    - cron: '0 */6 * * *'
+    # UTC 18:00, 00:00, 06:00, 12:00 对应北京时间 2:00, 8:00, 14:00, 20:00
+    - cron: '0 18,0,6,12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -25,18 +26,19 @@ jobs:
           git remote add upstream https://github.com/kuke31/xmlgz.git || true
           git fetch upstream
 
-      - name: 判断更新并生成状态文件
+      - name: 判断更新并生成状态文件（北京时间）
         run: |
           LOCAL=$(git rev-parse @)
           REMOTE=$(git rev-parse upstream/main)
-          TIME=$(date +"%Y-%m-%d %H:%M:%S")
+          # 强制用 Asia/Shanghai 时区，获取北京时间
+          TIME=$(TZ='Asia/Shanghai' date +"%Y-%m-%d %H:%M:%S")
 
           if [ "$LOCAL" = "$REMOTE" ]; then
             echo "update=no" >> $GITHUB_ENV
-            echo "【未更新】$TIME | 上游暂无更新" > sync_status.txt
+            echo "【未更新】$TIME | 上游暂无更新" > 更新时间说明.txt
           else
             echo "update=yes" >> $GITHUB_ENV
-            echo "【已同步】$TIME | 成功同步上游最新代码" > sync_status.txt
+            echo "【已同步】$TIME | 成功同步上游最新代码" > 更新时间说明.txt
           fi
 
       - name: 合并上游更新
@@ -46,8 +48,8 @@ jobs:
 
       - name: 提交状态文件
         run: |
-          git add sync_status.txt
-          git commit -m "更新同步状态 $(date +'%Y-%m-%d %H:%M')" || echo "状态文件无变化，无需提交"
+          git add 更新时间说明.txt
+          git commit -m "更新同步状态 $(TZ='Asia/Shanghai' date +'%Y-%m-%d %H:%M')" || echo "状态文件无变化，无需提交"
 
       - name: 推送到自己仓库
         uses: ad-m/github-push-action@master
